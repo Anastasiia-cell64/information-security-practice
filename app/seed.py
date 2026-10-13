@@ -59,7 +59,7 @@ def seed():
         student = User(
             username="student01",
             email="student@university.edu",
-            full_name="Петренко Марія Олексіївна",
+            full_name="Чернецька Анастасія Вікторівна",
             password_hash=hash_password("Student123!"),
             group_id=group.id,
         )
