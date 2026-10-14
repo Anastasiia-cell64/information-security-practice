@@ -1,0 +1,12 @@
+== 1. Секрети ==
+[0;32m[OK][0m .env є
+[0;32m[OK][0m .env у .gitignore
+== 2. Docker ==
+[0;32m[OK][0m Dockerfile: USER (non-root)
+[0;32m[OK][0m Dockerfile: HEALTHCHECK
+== 3. HTTPS і заголовок ==
+[0;32m[OK][0m HTTPS працює
+== 4. Залежності, код, образ ==
+[1;33m[WARN][0m pip-audit: є знахідки (reports/pip-audit.txt)
+[0;32m[OK][0m Bandit: HIGH-проблем немає
+[1;33m[WARN][0m Trivy: є CRITICAL (reports/trivy-critical.txt)

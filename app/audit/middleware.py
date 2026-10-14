@@ -4,7 +4,7 @@ from starlette.concurrency import run_in_threadpool
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
 from app.audit.logger import get_client_ip, log_event
-from app.auth.jwt_handler import verify_token
+from app.auth import verify_token
 from app.database import SessionLocal
 
 SKIP_PATHS = {"/health", "/docs", "/redoc", "/openapi.json", "/favicon.ico"}
@@ -16,8 +16,9 @@ def _user_id_from_token(request: Request) -> int | None:
     if not auth.lower().startswith("bearer "):
         return None
     try:
-        return int(verify_token(auth[7:]).get("sub"))
-    except (JWTError, TypeError, ValueError):
+        payload = verify_token(auth[7:])
+        return int(payload.get("sub"))
+    except Exception:
         return None
 
 

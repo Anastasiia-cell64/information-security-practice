@@ -7,7 +7,7 @@ from sqlalchemy.orm import relationship
 from app.crypto.encryption import blind_index, decrypt_field, encrypt_field
 from app.database import Base
 
-# Таблица связи пользователей и ролей (RBAC)
+# Таблиця зв'язку користувачів і ролей (RBAC)
 user_roles = Table(
     "user_roles",
     Base.metadata,
@@ -30,7 +30,7 @@ class User(Base):
     id = Column(Integer, primary_key=True, index=True)
     username = Column(String(50), unique=True, nullable=False, index=True)
 
-    # PII сохраняется исключительно как шифротекст Fernet[cite: 5]
+    # PII зберігається лише як шифротекст Fernet
     _encrypted_email = Column("encrypted_email", String(500), nullable=True)
     email_index = Column(String(64), unique=True, nullable=True, index=True)
     _encrypted_phone = Column("encrypted_phone", String(500), nullable=True)
@@ -38,12 +38,11 @@ class User(Base):
     password_hash = Column(String(150), nullable=False)
     full_name = Column(String(255), nullable=False)
     is_active = Column(Boolean, default=True)
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
     group_id = Column(Integer, ForeignKey("groups.id"), nullable=True)
 
     roles = relationship("Role", secondary=user_roles, back_populates="users")
 
-    # Свойства для прозрачного шифрования/расшифрования[cite: 5]
     @property
     def email(self) -> str | None:
         return decrypt_field(self._encrypted_email)
@@ -63,7 +62,9 @@ class User(Base):
 
     def __repr__(self):
         return f"<User {self.username}>"
-        class AuditLog(Base):
+
+
+class AuditLog(Base):
     """Журнал аудиту безпеки за правилом 5W."""
     __tablename__ = "audit_log"
 

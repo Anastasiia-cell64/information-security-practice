@@ -1,29 +1,35 @@
 from datetime import datetime
 from typing import List, Optional
-from pydantic import BaseModel, EmailStr, Field
+from pydantic import BaseModel, EmailStr
 
 
-class Token(BaseModel):
+class LoginRequest(BaseModel):
+    username: str
+    password: str
+
+
+class TokenResponse(BaseModel):
     access_token: str
+    refresh_token: str
     token_type: str = "bearer"
 
 
 class TokenData(BaseModel):
     username: Optional[str] = None
-    permissions: List[str] = []
 
 
 class UserBase(BaseModel):
-    username: str = Field(..., min_length=3, max_length=50)
-    email: EmailStr
-    full_name: str = Field(..., min_length=2, max_length=150)
+    username: str
+    full_name: str
+    email: Optional[EmailStr] = None
+    phone: Optional[str] = None
 
 
 class UserCreate(UserBase):
-    password: str = Field(..., min_length=8)
+    password: str
 
 
-class UserOut(UserBase):
+class UserResponse(UserBase):
     id: int
     is_active: bool
     created_at: datetime
@@ -33,6 +39,4 @@ class UserOut(UserBase):
         from_attributes = True
 
 
-class LoginRequest(BaseModel):
-    username: str
-    password: str
+UserOut = UserResponse
