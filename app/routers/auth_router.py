@@ -1,69 +1,52 @@
-from fastapi import APIRouter, Depends, HTTPException, status
-from fastapi.security import OAuth2PasswordRequestForm
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy.orm import Session
-
-from app.auth import create_access_token, get_current_user
+from app.crypto.encryption import blind_index
 from app.database import get_db
-from app.models import User
-from app.schemas import Token, UserCreate, UserOut
+from app.models import Role, User
+from app.schemas import UserCreate, UserResponse, LoginRequest, TokenResponse
 from app.security import hash_password, verify_password
+from app.auth.jwt_handler import create_access_token, create_refresh_token
 
-router = APIRouter(prefix="/auth", tags=["Authentication"])
+router = APIRouter(prefix="/auth", tags=["Auth"])
 
 
-@router.post("/register", response_model=UserOut, status_code=status.HTTP_201_CREATED)
-def register(user_data: UserCreate, db: Session = Depends(get_db)):
+@router.post("/register", response_model=UserResponse, status_code=status.HTTP_201_CREATED)
+def register(request: Request, user_data: UserCreate, db: Session = Depends(get_db)):
     if db.query(User).filter(User.username == user_data.username).first():
-        raise HTTPException(status_code=400, detail="Username already registered")
-    if db.query(User).filter(User.email == user_data.email).first():
-        raise HTTPException(status_code=400, detail="Email already registered")
+        raise HTTPException(status.HTTP_409_CONFLICT, detail="Username вже зайнятий")
 
-    user = User(
+    # Поиск дубликата по слепому индексу (HMAC) вместо открытого email
+    if db.query(User).filter(User.email_index == blind_index(user_data.email)).first():
+        raise HTTPException(status.HTTP_409_CONFLICT, detail="Email вже зареєстровано")
+
+    new_user = User(
         username=user_data.username,
         email=user_data.email,
         full_name=user_data.full_name,
         password_hash=hash_password(user_data.password),
     )
-    db.add(user)
+
+    student_role = db.query(Role).filter(Role.name == "student").first()
+    if student_role:
+        new_user.roles.append(student_role)
+
+    db.add(new_user)
     db.commit()
-    db.refresh(user)
-    
-    return UserOut(
-        id=user.id,
-        username=user.username,
-        email=user.email,
-        full_name=user.full_name,
-        is_active=user.is_active,
-        created_at=user.created_at,
-        roles=[r.name for r in user.roles]
-    )
+    db.refresh(new_user)
+    return new_user
 
 
-@router.post("/login", response_model=Token)
-def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)):
-    user = db.query(User).filter(User.username == form_data.username).first()
-    if not user or not verify_password(form_data.password, user.password_hash):
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Incorrect username or password",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
+@router.post("/login", response_model=TokenResponse)
+def login(request: Request, credentials: LoginRequest, db: Session = Depends(get_db)):
+    user = db.query(User).filter(User.username == credentials.username).first()
+    if not user or not verify_password(credentials.password, user.password_hash):
+        raise HTTPException(status.HTTP_401_UNAUTHORIZED, detail="Невірний логін або пароль")
 
-    user_perms = list({p.name for r in user.roles for p in r.permissions})
-    access_token = create_access_token(
-        data={"sub": user.username, "permissions": user_perms}
-    )
-    return {"access_token": access_token, "token_type": "bearer"}
+    if not user.is_active:
+        raise HTTPException(status.HTTP_403_FORBIDDEN, detail="Акаунт деактивовано")
 
-
-@router.get("/me", response_model=UserOut)
-def read_users_me(current_user: User = Depends(get_current_user)):
-    return UserOut(
-        id=current_user.id,
-        username=current_user.username,
-        email=current_user.email,
-        full_name=current_user.full_name,
-        is_active=current_user.is_active,
-        created_at=current_user.created_at,
-        roles=[r.name for r in current_user.roles]
+    role_name = user.roles[0].name if user.roles else "student"
+    return TokenResponse(
+        access_token=create_access_token(user.id, role_name),
+        refresh_token=create_refresh_token(user.id),
     )
